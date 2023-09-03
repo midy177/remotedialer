@@ -2,6 +2,7 @@ package remotedialer
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -49,14 +50,35 @@ func pipe(client *connection, server net.Conn) {
 
 	go func() {
 		defer wg.Done()
-		_, err := io.Copy(server, client)
+
+		buf1 := clientDialBytePool.Get()
+		defer clientDialBytePool.Put(buf1)
+
+		_, err := io.CopyBuffer(server, client, buf1)
+		//io.Copy(server, client)
 		close(err)
 	}()
+	buf2 := clientDialBytePool.Get()
+	defer clientDialBytePool.Put(buf2)
 
-	_, err := io.Copy(client, server)
+	_, err := io.CopyBuffer(client, server, buf2)
+
+	//_, err := io.Copy(client, server)
 	err = close(err)
 	wg.Wait()
 
 	// Write tunnel error after no more I/O is happening, just incase messages get out of order
 	client.writeErr(err)
 }
+
+// 初始化sync.Pool，new函数就是创建Person结构体
+func initCopyBufferPool() *sync.Pool {
+	return &sync.Pool{
+		New: func() interface{} {
+			fmt.Println("创建一个 person.")
+			return make([]byte, 32*1024)
+		},
+	}
+}
+
+var clientDialBytePool = NewBytePool(32 * 1024)
