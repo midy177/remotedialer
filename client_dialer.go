@@ -75,7 +75,6 @@ func pipe(client *connection, server net.Conn) {
 func initCopyBufferPool() *sync.Pool {
 	return &sync.Pool{
 		New: func() interface{} {
-			fmt.Println("创建一个 person.")
 			return make([]byte, 32*1024)
 		},
 	}
