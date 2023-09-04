@@ -65,14 +65,15 @@ func pipe(client *connection, server net.Conn) {
 		buf1 := clientDialBytePool.Get()
 		defer clientDialBytePool.Put(buf1)
 
-		_, err := io.CopyBuffer(server, client, buf1)
+		_, err := CopyBuffer(server, client, buf1)
 		//io.Copy(server, client)
 		close(err)
 	}()
+
 	buf2 := clientDialBytePool.Get()
 	defer clientDialBytePool.Put(buf2)
 
-	_, err := io.CopyBuffer(client, server, buf2)
+	_, err := CopyBuffer(client, server, buf2)
 
 	//_, err := io.Copy(client, server)
 	err = close(err)
