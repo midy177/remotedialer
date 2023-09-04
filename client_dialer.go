@@ -2,7 +2,6 @@ package remotedialer
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -69,15 +68,6 @@ func pipe(client *connection, server net.Conn) {
 
 	// Write tunnel error after no more I/O is happening, just incase messages get out of order
 	client.writeErr(err)
-}
-
-// 初始化sync.Pool，new函数就是创建Person结构体
-func initCopyBufferPool() *sync.Pool {
-	return &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 32*1024)
-		},
-	}
 }
 
 var clientDialBytePool = NewBytePool(32 * 1024)
