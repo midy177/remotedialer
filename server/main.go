@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/labstack/echo/v4"
 	"io"
 	"net/http"
 	"strconv"
@@ -127,6 +128,10 @@ func main() {
 	router.Handle("/connect", handler)
 	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, req *http.Request) {
 		Client(handler, rw, req)
+	})
+
+	remotedialer.ClientRouter.GET("/test", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
 	})
 
 	fmt.Println("Listening on ", addr)

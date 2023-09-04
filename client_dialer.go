@@ -1,15 +1,27 @@
 package remotedialer
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 )
 
 func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *message) {
 	defer conn.Close()
+	// 添加clientRouteHandler
+	if message.proto == "tcp" && message.address == "remotehandler:80" {
+		req, err := http.ReadRequest(bufio.NewReader(conn))
+		if err != nil {
+			conn.tunnelClose(err)
+			return
+		}
+		ClientRouter.ServeHTTP(&connResponseWriter{conn: conn}, req)
+		return
+	}
 
 	var (
 		netConn net.Conn

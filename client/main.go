@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/labstack/echo/v4"
 	"net/http"
 
 	"github.com/rancher/remotedialer"
@@ -28,6 +29,9 @@ func main() {
 	headers := http.Header{
 		"X-Tunnel-ID": []string{id},
 	}
+	remotedialer.ClientRouter.GET("/test", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
 
 	remotedialer.ClientConnect(context.Background(), addr, headers, nil, func(string, string) bool { return true }, nil)
 }
