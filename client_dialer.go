@@ -66,7 +66,6 @@ func pipe(client *connection, server net.Conn) {
 		defer clientDialBytePool.Put(buf1)
 
 		_, err := CopyBuffer(server, client, buf1)
-		//io.Copy(server, client)
 		close(err)
 	}()
 
@@ -75,7 +74,6 @@ func pipe(client *connection, server net.Conn) {
 
 	_, err := CopyBuffer(client, server, buf2)
 
-	//_, err := io.Copy(client, server)
 	err = close(err)
 	wg.Wait()
 
