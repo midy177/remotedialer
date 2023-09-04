@@ -130,7 +130,7 @@ func main() {
 		Client(handler, rw, req)
 	})
 
-	remotedialer.ClientRouter.GET("/test", func(c echo.Context) error {
+	remotedialer.ClientHandler.GET("/test", func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 

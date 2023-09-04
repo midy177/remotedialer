@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var ClientRouter = echo.New()
+var ClientHandler = echo.New()
 
 type connResponseWriter struct {
 	conn   io.ReadWriter
