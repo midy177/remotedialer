@@ -62,17 +62,11 @@ func pipe(client *connection, server net.Conn) {
 	go func() {
 		defer wg.Done()
 
-		buf1 := clientDialBytePool.Get()
-		defer clientDialBytePool.Put(buf1)
-
-		_, err := CopyBuffer(server, client, buf1)
+		_, err := io.Copy(server, client)
 		close(err)
 	}()
 
-	buf2 := clientDialBytePool.Get()
-	defer clientDialBytePool.Put(buf2)
-
-	_, err := CopyBuffer(client, server, buf2)
+	_, err := io.Copy(client, server)
 
 	err = close(err)
 	wg.Wait()
@@ -80,5 +74,3 @@ func pipe(client *connection, server net.Conn) {
 	// Write tunnel error after no more I/O is happening, just incase messages get out of order
 	client.writeErr(err)
 }
-
-var clientDialBytePool = NewBytePool(32 * 1024)
