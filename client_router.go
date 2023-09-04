@@ -41,7 +41,7 @@ func (w *connResponseWriter) WriteHeader(statusCode int) {
 
 	// 构建HTTP响应头
 	_, _ = fmt.Fprintf(w.conn, "HTTP/1.1 %d %s\r\n", statusCode, http.StatusText(statusCode))
-	w.Header().Write(w.conn)
+	_ = w.Header().Write(w.conn)
 	_, _ = fmt.Fprint(w.conn, "\r\n")
 }
 
