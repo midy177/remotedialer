@@ -50,6 +50,10 @@ func (w *connResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return &readWriterConn{w.conn}, bufio.NewReadWriter(bufio.NewReader(w.conn), bufio.NewWriter(w.conn)), nil
 }
 
+func (w *connResponseWriter) Flush() {
+
+}
+
 type readWriterConn struct {
 	io.ReadWriter
 }
