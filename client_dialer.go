@@ -16,7 +16,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *m
 	if dialer == nil && message.address == "remotehandler:80" {
 		req, err := http.ReadRequest(bufio.NewReader(conn))
 		if err != nil {
-			conn.tunnelClose(err)
+			conn.doTunnelClose(err)
 			return
 		}
 		ClientHandler.ServeHTTP(&connResponseWriter{conn: conn}, req)
