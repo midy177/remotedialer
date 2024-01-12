@@ -255,6 +255,7 @@ func (m *message) String() string {
 		return fmt.Sprintf("%d PAUSE        [%d]", m.id, m.connID)
 	case Resume:
 		return fmt.Sprintf("%d RESUME       [%d]", m.id, m.connID)
+	default:
+		return fmt.Sprintf("%d UNKNOWN[%d]: %d", m.id, m.connID, m.messageType)
 	}
-	return fmt.Sprintf("%d UNKNOWN[%d]: %d", m.id, m.connID, m.messageType)
 }

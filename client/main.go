@@ -28,9 +28,6 @@ func main() {
 	headers := http.Header{
 		"X-Tunnel-ID": []string{id},
 	}
-	//remotedialer.ClientHandler.GET("/test", func(c echo.Context) error {
-	//	return c.String(http.StatusOK, "ok")
-	//})
 
 	remotedialer.ClientConnect(context.Background(), addr, headers, nil, func(string, string) bool { return true }, nil)
 }

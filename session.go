@@ -126,55 +126,55 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 }
 
 func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
-	message, err := newServerMessage(reader)
+	serverMessage, err := newServerMessage(reader)
 	if err != nil {
 		return err
 	}
 
 	if PrintTunnelData {
-		logrus.Debug("REQUEST ", message)
+		logrus.Debug("REQUEST ", serverMessage)
 	}
 
-	if message.messageType == Connect {
-		if s.auth == nil || !s.auth(message.proto, message.address) {
+	if serverMessage.messageType == Connect {
+		if s.auth == nil || !s.auth(serverMessage.proto, serverMessage.address) {
 			return errors.New("connect not allowed")
 		}
-		s.clientConnect(ctx, message)
+		s.clientConnect(ctx, serverMessage)
 		return nil
 	}
 
 	s.Lock()
-	if message.messageType == AddClient && s.remoteClientKeys != nil {
-		err := s.addRemoteClient(message.address)
+	if serverMessage.messageType == AddClient && s.remoteClientKeys != nil {
+		err := s.addRemoteClient(serverMessage.address)
 		s.Unlock()
 		return err
-	} else if message.messageType == RemoveClient {
-		err := s.removeRemoteClient(message.address)
+	} else if serverMessage.messageType == RemoveClient {
+		err := s.removeRemoteClient(serverMessage.address)
 		s.Unlock()
 		return err
 	}
-	conn := s.conns[message.connID]
+	conn := s.conns[serverMessage.connID]
 	s.Unlock()
 
 	if conn == nil {
-		if message.messageType == Data {
-			err := fmt.Errorf("connection not found %s/%d/%d", s.clientKey, s.sessionKey, message.connID)
-			_, _ = newErrorMessage(message.connID, err).WriteTo(defaultDeadline(), s.conn)
+		if serverMessage.messageType == Data {
+			err := fmt.Errorf("connection not found %s/%d/%d", s.clientKey, s.sessionKey, serverMessage.connID)
+			_, _ = newErrorMessage(serverMessage.connID, err).WriteTo(defaultDeadline(), s.conn)
 		}
 		return nil
 	}
 
-	switch message.messageType {
+	switch serverMessage.messageType {
 	case Data:
-		if err := conn.OnData(message); err != nil {
-			s.closeConnection(message.connID, err)
+		if err := conn.OnData(serverMessage); err != nil {
+			s.closeConnection(serverMessage.connID, err)
 		}
 	case Pause:
 		conn.OnPause()
 	case Resume:
 		conn.OnResume()
 	case Error:
-		s.closeConnection(message.connID, message.Err())
+		s.closeConnection(serverMessage.connID, serverMessage.Err())
 	}
 
 	return nil
@@ -328,8 +328,8 @@ func (s *Session) Close() {
 
 	s.stopPings()
 
-	for _, connection := range s.conns {
-		connection.tunnelClose(errors.New("tunnel disconnect"))
+	for _, conn := range s.conns {
+		conn.tunnelClose(errors.New("tunnel disconnect"))
 	}
 
 	s.conns = map[int64]*connection{}

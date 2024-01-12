@@ -44,7 +44,7 @@ func New(auth Authorizer, errorWriter ErrorWriter) *Server {
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	clientKey, authed, peer, err := s.auth(req)
+	clientKey, authed, p, err := s.auth(req)
 	if err != nil {
 		s.errorWriter(rw, req, 400, err)
 		return
@@ -62,13 +62,13 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		Error:            s.errorWriter,
 	}
 
-	wsConn, err := upgrader.Upgrade(rw, req, nil)
+	conn, err := upgrader.Upgrade(rw, req, nil)
 	if err != nil {
 		s.errorWriter(rw, req, 400, errors.Wrapf(err, "Error during upgrade for host [%v]", clientKey))
 		return
 	}
 
-	session := s.sessions.add(clientKey, wsConn, peer)
+	session := s.sessions.add(clientKey, conn, p)
 	session.auth = s.ClientConnectAuthorizer
 	defer s.sessions.remove(session)
 
