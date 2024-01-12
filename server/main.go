@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/labstack/echo/v4"
 	"io"
 	"net/http"
 	"strconv"
@@ -130,10 +129,13 @@ func main() {
 		Client(handler, rw, req)
 	})
 
-	remotedialer.ClientHandler.GET("/test", func(c echo.Context) error {
-		return c.String(http.StatusOK, "ok")
-	})
+	//remotedialer.ClientHandler.GET("/test", func(c echo.Context) error {
+	//	return c.String(http.StatusOK, "ok")
+	//})
 
 	fmt.Println("Listening on ", addr)
-	http.ListenAndServe(addr, router)
+	err := http.ListenAndServe(addr, router)
+	if err != nil {
+		panic(err)
+	}
 }

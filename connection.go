@@ -2,6 +2,7 @@ package remotedialer
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -51,7 +52,7 @@ func (c *connection) doTunnelClose(err error) {
 		c.err = io.ErrClosedPipe
 	}
 
-	c.buffer.Close(c.err)
+	_ = c.buffer.Close(c.err)
 }
 
 func (c *connection) OnData(m *message) error {
@@ -88,8 +89,8 @@ func (c *connection) Write(b []byte) (int, error) {
 		go func(ctx context.Context) {
 			select {
 			case <-ctx.Done():
-				if ctx.Err() == context.DeadlineExceeded {
-					c.Close()
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					_ = c.Close()
 				}
 				return
 			}
@@ -124,7 +125,7 @@ func (c *connection) writeErr(err error) {
 	if err != nil {
 		msg := newErrorMessage(c.connID, err)
 		metrics.AddSMTotalTransmitErrorBytesOnWS(c.session.clientKey, float64(len(msg.Bytes())))
-		c.session.writeMessage(c.writeDeadline, msg)
+		_, _ = c.session.writeMessage(c.writeDeadline, msg)
 	}
 }
 

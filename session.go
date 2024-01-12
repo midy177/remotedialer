@@ -159,7 +159,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	if conn == nil {
 		if message.messageType == Data {
 			err := fmt.Errorf("connection not found %s/%d/%d", s.clientKey, s.sessionKey, message.connID)
-			newErrorMessage(message.connID, err).WriteTo(defaultDeadline(), s.conn)
+			_, _ = newErrorMessage(message.connID, err).WriteTo(defaultDeadline(), s.conn)
 		}
 		return nil
 	}
@@ -220,7 +220,7 @@ func (s *Session) removeRemoteClient(address string) error {
 	}
 
 	keys := s.remoteClientKeys[clientKey]
-	delete(keys, int(sessionKey))
+	delete(keys, sessionKey)
 	if len(keys) == 0 {
 		delete(s.remoteClientKeys, clientKey)
 	}
@@ -282,11 +282,11 @@ func (s *Session) serverConnectContext(ctx context.Context, proto, address strin
 
 	select {
 	case <-ctx.Done():
-		// We don't want to orphan an open connection so we wait for the result and immediately close it
+		// We don't want to orphan an open connection, so we wait for the result and immediately close it
 		go func() {
 			r := <-result
 			if r.err == nil {
-				r.conn.Close()
+				_ = r.conn.Close()
 			}
 		}()
 		return nil, ctx.Err()
@@ -339,7 +339,7 @@ func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
 	_, err := s.writeMessage(time.Time{}, newAddClient(client))
 	if err != nil {
-		s.conn.conn.Close()
+		_ = s.conn.conn.Close()
 	}
 }
 
@@ -347,6 +347,6 @@ func (s *Session) sessionRemoved(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
 	_, err := s.writeMessage(time.Time{}, newRemoveClient(client))
 	if err != nil {
-		s.conn.conn.Close()
+		_ = s.conn.conn.Close()
 	}
 }

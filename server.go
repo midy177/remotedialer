@@ -20,7 +20,7 @@ type ErrorWriter func(rw http.ResponseWriter, req *http.Request, code int, err e
 
 func DefaultErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err error) {
 	rw.WriteHeader(code)
-	rw.Write([]byte(err.Error()))
+	_, _ = rw.Write([]byte(err.Error()))
 }
 
 type Server struct {

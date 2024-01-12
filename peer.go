@@ -64,7 +64,7 @@ type peer struct {
 	cancel         func()
 }
 
-func (p peer) equals(other peer) bool {
+func (p *peer) equals(other peer) bool {
 	return p.url == other.url &&
 		p.id == other.id &&
 		p.token == other.token
@@ -119,7 +119,7 @@ outer:
 			logrus.Errorf("Failed to serve peer connection %s: %v", p.id, err)
 		}
 
-		ws.Close()
+		_ = ws.Close()
 		time.Sleep(5 * time.Second)
 	}
 }

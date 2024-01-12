@@ -19,7 +19,7 @@ func ClientConnect(ctx context.Context, wsURL string, headers http.Header, diale
 	auth ConnectAuthorizer, onConnect func(context.Context, *Session) error) error {
 	if err := ConnectToProxy(ctx, wsURL, headers, auth, dialer, onConnect); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			logrus.WithError(err).Error("Remotedialer proxy error")
+			logrus.WithError(err).Error("RemoteDialer proxy error")
 			time.Sleep(time.Duration(5) * time.Second)
 		}
 		return err
@@ -50,7 +50,9 @@ func ConnectToProxy(rootCtx context.Context, proxyURL string, headers http.Heade
 		}
 		return err
 	}
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		_ = ws.Close()
+	}(ws)
 
 	result := make(chan error, 2)
 
