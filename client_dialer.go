@@ -20,6 +20,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *m
 
 	// Do client hijacker
 	if !ClientHijack(conn, message.proto, message.address) {
+		conn.tunnelClose(io.EOF)
 		return
 	}
 
