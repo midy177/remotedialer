@@ -24,10 +24,7 @@ const (
 	Resume
 )
 
-var (
-	idCounter      int64
-	legacyDeadline = (15 * time.Second).Milliseconds()
-)
+var idCounter int64
 
 func init() {
 	r := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
@@ -47,13 +44,13 @@ type message struct {
 	address     string
 }
 
-func nextid() int64 {
+func nextId() int64 {
 	return atomic.AddInt64(&idCounter, 1)
 }
 
 func newMessage(connID int64, bytes []byte) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		connID:      connID,
 		messageType: Data,
 		bytes:       bytes,
@@ -62,7 +59,7 @@ func newMessage(connID int64, bytes []byte) *message {
 
 func newPause(connID int64) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		connID:      connID,
 		messageType: Pause,
 	}
@@ -70,7 +67,7 @@ func newPause(connID int64) *message {
 
 func newResume(connID int64) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		connID:      connID,
 		messageType: Resume,
 	}
@@ -78,7 +75,7 @@ func newResume(connID int64) *message {
 
 func newConnect(connID int64, proto, address string) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		connID:      connID,
 		messageType: Connect,
 		bytes:       []byte(fmt.Sprintf("%s/%s", proto, address)),
@@ -89,7 +86,7 @@ func newConnect(connID int64, proto, address string) *message {
 
 func newErrorMessage(connID int64, err error) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		err:         err,
 		connID:      connID,
 		messageType: Error,
@@ -99,7 +96,7 @@ func newErrorMessage(connID int64, err error) *message {
 
 func newAddClient(client string) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		messageType: AddClient,
 		address:     client,
 		bytes:       []byte(client),
@@ -108,7 +105,7 @@ func newAddClient(client string) *message {
 
 func newRemoveClient(client string) *message {
 	return &message{
-		id:          nextid(),
+		id:          nextId(),
 		messageType: RemoveClient,
 		address:     client,
 		bytes:       []byte(client),
@@ -140,16 +137,8 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		body:        buf,
 	}
 
-	if m.messageType == Data || m.messageType == Connect {
-		// no longer used, this is the deadline field
-		_, err := binary.ReadVarint(buf)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if m.messageType == Connect {
-		bytes, err := io.ReadAll(io.LimitReader(buf, 100))
+		bytes, err := io.ReadAll(io.LimitReader(buf, 512))
 		if err != nil {
 			return nil, err
 		}
@@ -191,19 +180,24 @@ func (m *message) Err() error {
 }
 
 func (m *message) Bytes() []byte {
-	return append(m.header(len(m.bytes)), m.bytes...)
+	// Calculate required buffer size
+	space := len(m.bytes)
+	buf := make([]byte, 24+space)
+	// offset of header data
+	offset := m.header(buf)
+	// Copy message data to buffer
+	copy(buf[offset:], m.bytes)
+	return buf
 }
 
-func (m *message) header(space int) []byte {
-	buf := make([]byte, 24+space)
+func (m *message) header(buf []byte) int {
+	// offset of header data
 	offset := 0
+	//Write various header information into the buffer
 	offset += binary.PutVarint(buf[offset:], m.id)
 	offset += binary.PutVarint(buf[offset:], m.connID)
 	offset += binary.PutVarint(buf[offset:], int64(m.messageType))
-	if m.messageType == Data || m.messageType == Connect {
-		offset += binary.PutVarint(buf[offset:], legacyDeadline)
-	}
-	return buf[:offset]
+	return offset
 }
 
 func (m *message) Read(p []byte) (int, error) {

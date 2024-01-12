@@ -4,21 +4,22 @@ import (
 	"context"
 	"io"
 	"net"
-	"sync"
 	"time"
 )
 
 type Hijacker func(conn net.Conn, proto, address string) (next bool)
 
-var ClientHijacker Hijacker = func(conn net.Conn, proto, address string) (next bool) {
+var ClientHijack Hijacker = func(conn net.Conn, proto, address string) (next bool) {
 	return true
 }
 
 func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *message) {
-	defer conn.Close()
+	defer func(conn *connection) {
+		_ = conn.Close()
+	}(conn)
 
 	// Do client hijacker
-	if !ClientHijacker(conn, message.proto, message.address) {
+	if !ClientHijack(conn, message.proto, message.address) {
 		return
 	}
 
@@ -40,36 +41,32 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *m
 		conn.tunnelClose(err)
 		return
 	}
-	defer netConn.Close()
+	defer func(netConn net.Conn) {
+		_ = netConn.Close()
+	}(netConn)
 
 	pipe(conn, netConn)
 }
 
 func pipe(client *connection, server net.Conn) {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	ch := make(chan struct{}, 1)
 
-	close := func(err error) error {
+	deFun := func(err error) error {
 		if err == nil {
 			err = io.EOF
 		}
 		client.doTunnelClose(err)
-		server.Close()
+		_ = server.Close()
 		return err
 	}
-
 	go func() {
-		defer wg.Done()
-
+		defer close(ch)
 		_, err := io.Copy(server, client)
-		close(err)
+		_ = deFun(err)
 	}()
-
 	_, err := io.Copy(client, server)
-
-	err = close(err)
-	wg.Wait()
-
+	err = deFun(err)
+	<-ch
 	// Write tunnel error after no more I/O is happening, just incase messages get out of order
 	client.writeErr(err)
 }

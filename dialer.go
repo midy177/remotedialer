@@ -18,7 +18,6 @@ func (s *Server) Dialer(clientKey string) Dialer {
 		if err != nil {
 			return nil, err
 		}
-
 		return d(ctx, network, address)
 	}
 }
