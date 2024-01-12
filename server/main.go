@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/remotedialer"
+	"github.com/midy177/remotedialer"
 	"github.com/sirupsen/logrus"
 )
 
