@@ -3,15 +3,12 @@ package remotedialer
 import (
 	"bufio"
 	"fmt"
-	"github.com/labstack/echo/v4"
 	"io"
 	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
 )
-
-var ClientHandler = echo.New()
 
 type connResponseWriter struct {
 	conn   io.ReadWriter

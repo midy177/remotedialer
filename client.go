@@ -3,7 +3,7 @@ package remotedialer
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -41,7 +41,7 @@ func ConnectToProxy(rootCtx context.Context, proxyURL string, headers http.Heade
 				logrus.WithError(err).Errorf("Failed to connect to proxy. Empty dialer response")
 			}
 		} else {
-			rb, err2 := ioutil.ReadAll(resp.Body)
+			rb, err2 := io.ReadAll(resp.Body)
 			if err2 != nil {
 				logrus.WithError(err).Errorf("Failed to connect to proxy. Response status: %v - %v. Couldn't read response body (err: %v)", resp.StatusCode, resp.Status, err2)
 			} else {

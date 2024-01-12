@@ -1,25 +1,24 @@
 package remotedialer
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"net"
-	"net/http"
 	"sync"
 	"time"
 )
 
+type Hijacker func(conn net.Conn, proto, address string) (next bool)
+
+var ClientHijacker Hijacker = func(conn net.Conn, proto, address string) (next bool) {
+	return true
+}
+
 func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *message) {
 	defer conn.Close()
-	// add clientRouteHandler
-	if dialer == nil && message.address == "remotehandler:80" {
-		req, err := http.ReadRequest(bufio.NewReader(conn))
-		if err != nil {
-			conn.doTunnelClose(err)
-			return
-		}
-		ClientHandler.ServeHTTP(&connResponseWriter{conn: conn}, req)
+
+	// Do client hijacker
+	if !ClientHijacker(conn, message.proto, message.address) {
 		return
 	}
 

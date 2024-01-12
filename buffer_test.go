@@ -2,7 +2,7 @@ package remotedialer
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -50,12 +50,12 @@ func TestExceedBuffer(t *testing.T) {
 	}
 	defer resp2.Body.Close()
 
-	resp2Body, err := ioutil.ReadAll(resp2.Body)
+	resp2Body, err := io.ReadAll(resp2.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
