@@ -51,7 +51,7 @@ func nextId() int64 {
 	return atomic.AddInt64(&idCounter, 1)
 }
 
-func newMessage(connID int64, bytes []byte) *message {
+func newDataMessage(connID int64, bytes []byte) *message {
 	return &message{
 		id:          nextId(),
 		connID:      connID,
@@ -60,7 +60,7 @@ func newMessage(connID int64, bytes []byte) *message {
 	}
 }
 
-func newPause(connID int64) *message {
+func newPauseMessage(connID int64) *message {
 	return &message{
 		id:          nextId(),
 		connID:      connID,
@@ -68,7 +68,7 @@ func newPause(connID int64) *message {
 	}
 }
 
-func newResume(connID int64) *message {
+func newResumeMessage(connID int64) *message {
 	return &message{
 		id:          nextId(),
 		connID:      connID,
@@ -76,7 +76,7 @@ func newResume(connID int64) *message {
 	}
 }
 
-func newConnect(connID int64, proto, address string) *message {
+func newConnectMessage(connID int64, proto, address string) *message {
 	return &message{
 		id:          nextId(),
 		connID:      connID,
@@ -187,6 +187,16 @@ func (m *message) Err() error {
 		m.err = errors.New(str)
 	}
 	return m.err
+}
+
+func (m *message) BytesLength() int {
+	space := len(m.bytes) + 24
+	if m.messageType == Data || m.messageType == Connect {
+		// no longer used, this is the deadline field
+		space += 8
+	}
+
+	return space
 }
 
 func (m *message) Bytes() []byte {

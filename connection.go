@@ -98,8 +98,8 @@ func (c *connection) Write(b []byte) (int, error) {
 	}
 
 	c.backPressure.Wait(cancel)
-	msg := newMessage(c.connID, b)
-	metrics.AddSMTotalTransmitBytesOnWS(c.session.clientKey, float64(len(msg.Bytes())))
+	msg := newDataMessage(c.connID, b)
+	metrics.AddSMTotalTransmitBytesOnWS(c.session.clientKey, float64(msg.BytesLength()))
 	return c.session.writeMessage(c.writeDeadline, msg)
 }
 
@@ -112,19 +112,19 @@ func (c *connection) OnResume() {
 }
 
 func (c *connection) Pause() {
-	msg := newPause(c.connID)
+	msg := newPauseMessage(c.connID)
 	_, _ = c.session.writeMessage(c.writeDeadline, msg)
 }
 
 func (c *connection) Resume() {
-	msg := newResume(c.connID)
+	msg := newResumeMessage(c.connID)
 	_, _ = c.session.writeMessage(c.writeDeadline, msg)
 }
 
 func (c *connection) writeErr(err error) {
 	if err != nil {
 		msg := newErrorMessage(c.connID, err)
-		metrics.AddSMTotalTransmitErrorBytesOnWS(c.session.clientKey, float64(len(msg.Bytes())))
+		metrics.AddSMTotalTransmitErrorBytesOnWS(c.session.clientKey, float64(msg.BytesLength()))
 		_, _ = c.session.writeMessage(c.writeDeadline, msg)
 	}
 }

@@ -306,7 +306,7 @@ func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.
 	}
 	s.Unlock()
 
-	_, err := s.writeMessage(deadline, newConnect(connID, proto, address))
+	_, err := s.writeMessage(deadline, newConnectMessage(connID, proto, address))
 	if err != nil {
 		s.closeConnection(connID, err)
 		return nil, err
