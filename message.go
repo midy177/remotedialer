@@ -24,7 +24,10 @@ const (
 	Resume
 )
 
-var idCounter int64
+var (
+	idCounter      int64
+	legacyDeadline = (15 * time.Second).Milliseconds()
+)
 
 func init() {
 	r := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
@@ -137,6 +140,13 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		body:        buf,
 	}
 
+	if m.messageType == Data || m.messageType == Connect {
+		// no longer used, this is the deadline field
+		_, err := binary.ReadVarint(buf)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if m.messageType == Connect {
 		bytes, err := io.ReadAll(io.LimitReader(buf, 512))
 		if err != nil {
@@ -181,8 +191,12 @@ func (m *message) Err() error {
 
 func (m *message) Bytes() []byte {
 	// Calculate required buffer size
-	space := len(m.bytes)
-	buf := make([]byte, 24+space)
+	space := len(m.bytes) + 24
+	if m.messageType == Data || m.messageType == Connect {
+		// no longer used, this is the deadline field
+		space += 8
+	}
+	buf := make([]byte, space)
 	// offset of header data
 	offset := m.header(buf)
 	// Copy message data to buffer
@@ -197,6 +211,9 @@ func (m *message) header(buf []byte) int {
 	offset += binary.PutVarint(buf[offset:], m.id)
 	offset += binary.PutVarint(buf[offset:], m.connID)
 	offset += binary.PutVarint(buf[offset:], int64(m.messageType))
+	if m.messageType == Data || m.messageType == Connect {
+		offset += binary.PutVarint(buf[offset:], legacyDeadline)
+	}
 	return offset
 }
 
