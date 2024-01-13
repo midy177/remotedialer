@@ -30,13 +30,13 @@ type Server struct {
 	authorizer              Authorizer
 	errorWriter             ErrorWriter
 	sessions                *sessionManager
-	peers                   map[string]peer
+	peers                   map[string]*peer
 	peerLock                sync.Mutex
 }
 
 func New(auth Authorizer, errorWriter ErrorWriter) *Server {
 	return &Server{
-		peers:       map[string]peer{},
+		peers:       map[string]*peer{},
 		authorizer:  auth,
 		errorWriter: errorWriter,
 		sessions:    newSessionManager(),

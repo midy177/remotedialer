@@ -53,7 +53,7 @@ func (w *wsConn) NextReader() (int, io.Reader, error) {
 }
 
 func (w *wsConn) setupDeadline() {
-	w.conn.SetReadDeadline(time.Now().Add(PingWaitDuration))
+	_ = w.conn.SetReadDeadline(time.Now().Add(PingWaitDuration))
 	w.conn.SetPingHandler(func(string) error {
 		w.Lock()
 		err := w.conn.WriteControl(websocket.PongMessage, []byte(""), time.Now().Add(PingWaitDuration))

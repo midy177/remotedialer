@@ -25,27 +25,27 @@ func (s *Server) AddPeer(url, id, token string) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	peer := peer{
+	NewP := &peer{
 		url:    url,
 		id:     id,
 		token:  token,
 		cancel: cancel,
 	}
 
-	logrus.Infof("Adding peer %s, %s", url, id)
+	logrus.Infof("Adding p %s, %s", url, id)
 
 	s.peerLock.Lock()
 	defer s.peerLock.Unlock()
 
 	if p, ok := s.peers[id]; ok {
-		if p.equals(peer) {
+		if p.equals(NewP) {
 			return
 		}
 		p.cancel()
 	}
 
-	s.peers[id] = peer
-	go peer.start(ctx, s)
+	s.peers[id] = NewP
+	go NewP.start(ctx, s)
 }
 
 func (s *Server) RemovePeer(id string) {
@@ -64,7 +64,7 @@ type peer struct {
 	cancel         func()
 }
 
-func (p *peer) equals(other peer) bool {
+func (p *peer) equals(other *peer) bool {
 	return p.url == other.url &&
 		p.id == other.id &&
 		p.token == other.token

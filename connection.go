@@ -16,14 +16,14 @@ type connection struct {
 	writeDeadline time.Time
 	backPressure  *backPressure
 	buffer        *readBuffer
-	addr          addr
+	addr          *addr
 	session       *Session
 	connID        int64
 }
 
 func newConnection(connID int64, session *Session, proto, address string) *connection {
 	c := &connection{
-		addr: addr{
+		addr: &addr{
 			proto:   proto,
 			address: address,
 		},
@@ -163,10 +163,10 @@ type addr struct {
 	address string
 }
 
-func (a addr) Network() string {
+func (a *addr) Network() string {
 	return a.proto
 }
 
-func (a addr) String() string {
+func (a *addr) String() string {
 	return a.address
 }

@@ -28,7 +28,7 @@ type Session struct {
 	remoteClientKeys map[string]map[int]bool
 	auth             ConnectAuthorizer
 	pingCancel       context.CancelFunc
-	pingWait         sync.WaitGroup
+	pingWait         chan struct{}
 	dialer           Dialer
 	client           bool
 }
@@ -54,6 +54,7 @@ func NewClientSessionWithDialer(auth ConnectAuthorizer, conn *websocket.Conn, di
 		auth:      auth,
 		client:    true,
 		dialer:    dialer,
+		pingWait:  make(chan struct{}, 1),
 	}
 }
 
@@ -65,16 +66,17 @@ func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *Sessi
 		conn:             newWSConn(conn),
 		conns:            map[int64]*connection{},
 		remoteClientKeys: map[string]map[int]bool{},
+		pingWait:         make(chan struct{}, 1),
 	}
 }
 
 func (s *Session) startPings(rootCtx context.Context) {
 	ctx, cancel := context.WithCancel(rootCtx)
 	s.pingCancel = cancel
-	s.pingWait.Add(1)
+	//s.pingWait.Add(1)
 
 	go func() {
-		defer s.pingWait.Done()
+		defer close(s.pingWait)
 
 		t := time.NewTicker(PingWriteInterval)
 		defer t.Stop()
@@ -101,7 +103,7 @@ func (s *Session) stopPings() {
 	}
 
 	s.pingCancel()
-	s.pingWait.Wait()
+	<-s.pingWait
 }
 
 func (s *Session) Serve(ctx context.Context) (int, error) {
