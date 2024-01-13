@@ -13,13 +13,13 @@ var DialHijack Hijacker = func(conn net.Conn, proto, address string) (next bool)
 	return true
 }
 
-func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *message) {
+func clientDial(ctx context.Context, dialer Dialer, conn *connection, proto, address string) {
 	defer func(conn *connection) {
 		_ = conn.Close()
 	}(conn)
 
 	// Do client hijacker
-	if !DialHijack(conn, message.proto, message.address) {
+	if !DialHijack(conn, proto, address) {
 		conn.tunnelClose(io.EOF)
 		return
 	}
@@ -32,9 +32,9 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *m
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Minute))
 	if dialer == nil {
 		d := net.Dialer{}
-		netConn, err = d.DialContext(ctx, message.proto, message.address)
+		netConn, err = d.DialContext(ctx, proto, address)
 	} else {
-		netConn, err = dialer(ctx, message.proto, message.address)
+		netConn, err = dialer(ctx, proto, address)
 	}
 	cancel()
 

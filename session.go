@@ -261,7 +261,7 @@ func (s *Session) clientConnect(ctx context.Context, message *message) {
 	}
 	s.Unlock()
 
-	go clientDial(ctx, s.dialer, conn, message)
+	go clientDial(ctx, s.dialer, conn, message.proto, message.address)
 }
 
 type connResult struct {
