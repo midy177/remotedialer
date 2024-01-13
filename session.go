@@ -127,6 +127,7 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 
 func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	serverMessage, err := newServerMessage(reader)
+	defer serverMessage.put()
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,9 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	if conn == nil {
 		if serverMessage.messageType == Data {
 			err := fmt.Errorf("connection not found %s/%d/%d", s.clientKey, s.sessionKey, serverMessage.connID)
-			_, _ = newErrorMessage(serverMessage.connID, err).WriteTo(defaultDeadline(), s.conn)
+			msg := newErrorMessage(serverMessage.connID, err)
+			defer msg.put()
+			_, _ = msg.WriteTo(defaultDeadline(), s.conn)
 		}
 		return nil
 	}
@@ -175,6 +178,8 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 		conn.OnResume()
 	case Error:
 		s.closeConnection(serverMessage.connID, serverMessage.Err())
+	default:
+		logrus.Errorf("Connection (%d) sent an unknown message type (%d)", serverMessage.connID, serverMessage.messageType)
 	}
 
 	return nil
@@ -305,8 +310,9 @@ func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.
 		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
 	}
 	s.Unlock()
-
-	_, err := s.writeMessage(deadline, newConnectMessage(connID, proto, address))
+	msg := newConnectMessage(connID, proto, address)
+	defer msg.put()
+	_, err := s.writeMessage(deadline, msg)
 	if err != nil {
 		s.closeConnection(connID, err)
 		return nil, err
@@ -337,7 +343,9 @@ func (s *Session) Close() {
 
 func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
-	_, err := s.writeMessage(time.Time{}, newAddClient(client))
+	msg := newAddClient(client)
+	defer msg.put()
+	_, err := s.writeMessage(time.Time{}, msg)
 	if err != nil {
 		_ = s.conn.conn.Close()
 	}
@@ -345,7 +353,9 @@ func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 
 func (s *Session) sessionRemoved(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
-	_, err := s.writeMessage(time.Time{}, newRemoveClient(client))
+	msg := newRemoveClient(client)
+	defer msg.put()
+	_, err := s.writeMessage(time.Time{}, msg)
 	if err != nil {
 		_ = s.conn.conn.Close()
 	}

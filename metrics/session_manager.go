@@ -17,7 +17,7 @@ var (
 			Name:      "total_add_websocket_session",
 			Help:      "Total count of added websocket sessions",
 		},
-		[]string{"clientkey", "peer"})
+		[]string{"clientKey", "peer"})
 
 	TotalRemoveWS = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -25,7 +25,7 @@ var (
 			Name:      "total_remove_websocket_session",
 			Help:      "Total count of removed websocket sessions",
 		},
-		[]string{"clientkey", "peer"})
+		[]string{"clientKey", "peer"})
 
 	TotalAddConnectionsForWS = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -33,7 +33,7 @@ var (
 			Name:      "total_add_connections",
 			Help:      "Total count of added connections",
 		},
-		[]string{"clientkey", "proto", "addr"},
+		[]string{"clientKey", "proto", "addr"},
 	)
 
 	TotalRemoveConnectionsForWS = prometheus.NewCounterVec(
@@ -42,7 +42,7 @@ var (
 			Name:      "total_remove_connections",
 			Help:      "Total count of removed connections",
 		},
-		[]string{"clientkey", "proto", "addr"},
+		[]string{"clientKey", "proto", "addr"},
 	)
 
 	TotalTransmitBytesOnWS = prometheus.NewCounterVec(
@@ -51,7 +51,7 @@ var (
 			Name:      "total_transmit_bytes",
 			Help:      "Total bytes transmitted",
 		},
-		[]string{"clientkey"},
+		[]string{"clientKey"},
 	)
 
 	TotalTransmitErrorBytesOnWS = prometheus.NewCounterVec(
@@ -60,7 +60,7 @@ var (
 			Name:      "total_transmit_error_bytes",
 			Help:      "Total error bytes transmitted",
 		},
-		[]string{"clientkey"},
+		[]string{"clientKey"},
 	)
 
 	TotalReceiveBytesOnWS = prometheus.NewCounterVec(
@@ -69,7 +69,7 @@ var (
 			Name:      "total_receive_bytes",
 			Help:      "Total bytes received",
 		},
-		[]string{"clientkey"},
+		[]string{"clientKey"},
 	)
 
 	TotalAddPeerAttempt = prometheus.NewCounterVec(
@@ -133,7 +133,7 @@ func IncSMTotalAddWS(clientKey string, peer bool) {
 	if prometheusMetrics {
 		TotalAddWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 				"peer":      peerStr,
 			}).Inc()
 	}
@@ -149,7 +149,7 @@ func IncSMTotalRemoveWS(clientKey string, peer bool) {
 		}
 		TotalRemoveWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 				"peer":      peerStr,
 			}).Inc()
 	}
@@ -159,7 +159,7 @@ func AddSMTotalTransmitErrorBytesOnWS(clientKey string, size float64) {
 	if prometheusMetrics {
 		TotalTransmitErrorBytesOnWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 			}).Add(size)
 	}
 }
@@ -168,7 +168,7 @@ func AddSMTotalTransmitBytesOnWS(clientKey string, size float64) {
 	if prometheusMetrics {
 		TotalTransmitBytesOnWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 			}).Add(size)
 	}
 }
@@ -177,7 +177,7 @@ func AddSMTotalReceiveBytesOnWS(clientKey string, size float64) {
 	if prometheusMetrics {
 		TotalReceiveBytesOnWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 			}).Add(size)
 	}
 }
@@ -186,7 +186,7 @@ func IncSMTotalAddConnectionsForWS(clientKey, proto, addr string) {
 	if prometheusMetrics {
 		TotalAddConnectionsForWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 				"proto":     proto,
 				"addr":      addr,
 			}).Inc()
@@ -197,7 +197,7 @@ func IncSMTotalRemoveConnectionsForWS(clientKey, proto, addr string) {
 	if prometheusMetrics {
 		TotalRemoveConnectionsForWS.With(
 			prometheus.Labels{
-				"clientkey": clientKey,
+				"clientKey": clientKey,
 				"proto":     proto,
 				"addr":      addr,
 			}).Inc()

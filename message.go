@@ -5,13 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"io"
 	"math/rand"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 const (
@@ -27,11 +27,17 @@ const (
 var (
 	idCounter      int64
 	legacyDeadline = (15 * time.Second).Milliseconds()
+	messagePool    sync.Pool
 )
 
 func init() {
 	r := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	idCounter = r.Int63()
+	messagePool = sync.Pool{
+		New: func() any {
+			return &message{}
+		},
+	}
 }
 
 type messageType int64
@@ -52,58 +58,56 @@ func nextId() int64 {
 }
 
 func newDataMessage(connID int64, bytes []byte) *message {
-	return &message{
-		id:          nextId(),
-		connID:      connID,
-		messageType: Data,
-		bytes:       bytes,
-	}
+	msg := messagePool.Get().(*message)
+	msg.id = nextId()
+	msg.connID = connID
+	msg.messageType = Data
+	msg.bytes = bytes
+	return msg
 }
 
 func newPauseMessage(connID int64) *message {
-	return &message{
-		id:          nextId(),
-		connID:      connID,
-		messageType: Pause,
-	}
+	msg := messagePool.Get().(*message)
+	msg.id = nextId()
+	msg.connID = connID
+	msg.messageType = Pause
+	return msg
 }
 
 func newResumeMessage(connID int64) *message {
-	return &message{
-		id:          nextId(),
-		connID:      connID,
-		messageType: Resume,
-	}
+	msg := messagePool.Get().(*message)
+	msg.id = nextId()
+	msg.connID = connID
+	msg.messageType = Resume
+	return msg
 }
 
 func newConnectMessage(connID int64, proto, address string) *message {
-	return &message{
-		id:          nextId(),
-		connID:      connID,
-		messageType: Connect,
-		bytes:       []byte(fmt.Sprintf("%s/%s", proto, address)),
-		proto:       proto,
-		address:     address,
-	}
+	msg := messagePool.Get().(*message)
+	msg.id = nextId()
+	msg.connID = connID
+	msg.messageType = Connect
+	msg.bytes = []byte(fmt.Sprintf("%s/%s", proto, address))
+	msg.proto = proto
+	msg.address = address
+	return msg
 }
 
 func newErrorMessage(connID int64, err error) *message {
-	return &message{
-		id:          nextId(),
-		err:         err,
-		connID:      connID,
-		messageType: Error,
-		bytes:       []byte(err.Error()),
-	}
+	msg := messagePool.Get().(*message)
+	msg.id = nextId()
+	msg.connID = connID
+	msg.messageType = Error
+	msg.bytes = []byte(err.Error())
+	return msg
 }
 
 func newAddClient(client string) *message {
-	return &message{
-		id:          nextId(),
-		messageType: AddClient,
-		address:     client,
-		bytes:       []byte(client),
-	}
+	msg := messagePool.Get().(*message)
+	msg.id = nextId()
+	msg.messageType = AddClient
+	msg.bytes = []byte(client)
+	return msg
 }
 
 func newRemoveClient(client string) *message {
@@ -133,12 +137,11 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		return nil, err
 	}
 
-	m := &message{
-		id:          id,
-		messageType: messageType(mType),
-		connID:      connID,
-		body:        buf,
-	}
+	m := messagePool.Get().(*message)
+	m.id = id
+	m.connID = connID
+	m.messageType = messageType(mType)
+	m.body = buf
 
 	if m.messageType == Data || m.messageType == Connect {
 		// no longer used, this is the deadline field
@@ -169,6 +172,15 @@ func newServerMessage(reader io.Reader) (*message, error) {
 	}
 
 	return m, nil
+}
+
+func (m *message) put() {
+	m.err = nil
+	m.bytes = nil
+	m.body = nil
+	m.proto = ""
+	m.address = ""
+	messagePool.Put(m)
 }
 
 func (m *message) Err() error {
