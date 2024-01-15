@@ -152,7 +152,7 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		}
 	}
 	if m.messageType == Connect {
-		bytes, err := io.ReadAll(io.LimitReader(buf, 512))
+		bytes, err := io.ReadAll(io.LimitReader(buf, 100))
 		if err != nil {
 			m.put()
 			return nil, err
@@ -205,18 +205,22 @@ func (m *message) Err() error {
 }
 
 func (m *message) BytesLength() int {
-	space := len(m.bytes) + 24
+	// offset of header data
+	offset := 0
+	//Write various header information into the buffer
+	offset += binary.Size(m.id)
+	offset += binary.Size(m.connID)
+	offset += binary.Size(int64(m.messageType))
 	if m.messageType == Data || m.messageType == Connect {
-		// no longer used, this is the deadline field
-		space += 8
+		offset += binary.Size(legacyDeadline)
 	}
-
-	return space
+	return len(m.bytes) + offset
 }
 
 func (m *message) Bytes() []byte {
+	bytesLength := len(m.bytes)
 	// Calculate required buffer size
-	space := len(m.bytes) + 24
+	space := bytesLength + 24
 	if m.messageType == Data || m.messageType == Connect {
 		// no longer used, this is the deadline field
 		space += 8
@@ -226,7 +230,7 @@ func (m *message) Bytes() []byte {
 	offset := m.header(buf)
 	// Copy message data to buffer
 	copy(buf[offset:], m.bytes)
-	return buf
+	return buf[:offset+bytesLength]
 }
 
 func (m *message) header(buf []byte) int {
