@@ -20,7 +20,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, proto, add
 
 	// Do client hijacker
 	if !DialHijack(conn, proto, address) {
-		conn.tunnelClose(io.EOF)
+		conn.doTunnelClose(io.EOF)
 		return
 	}
 
@@ -39,7 +39,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, proto, add
 	cancel()
 
 	if err != nil {
-		conn.tunnelClose(err)
+		conn.doTunnelClose(err)
 		return
 	}
 	defer func(netConn net.Conn) {

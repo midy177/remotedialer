@@ -147,12 +147,14 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		// no longer used, this is the deadline field
 		_, err := binary.ReadVarint(buf)
 		if err != nil {
+			m.put()
 			return nil, err
 		}
 	}
 	if m.messageType == Connect {
 		bytes, err := io.ReadAll(io.LimitReader(buf, 512))
 		if err != nil {
+			m.put()
 			return nil, err
 		}
 		parts := strings.SplitN(string(bytes), "/", 2)
@@ -165,6 +167,7 @@ func newServerMessage(reader io.Reader) (*message, error) {
 	} else if m.messageType == AddClient || m.messageType == RemoveClient {
 		bytes, err := io.ReadAll(io.LimitReader(buf, 100))
 		if err != nil {
+			m.put()
 			return nil, err
 		}
 		m.address = string(bytes)

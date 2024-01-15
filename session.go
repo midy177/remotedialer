@@ -66,7 +66,6 @@ func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *Sessi
 		conn:             newWSConn(conn),
 		conns:            map[int64]*connection{},
 		remoteClientKeys: map[string]map[int]bool{},
-		pingWait:         make(chan struct{}, 1),
 	}
 }
 
@@ -101,7 +100,6 @@ func (s *Session) stopPings() {
 	if s.pingCancel == nil {
 		return
 	}
-
 	s.pingCancel()
 	<-s.pingWait
 }
@@ -129,10 +127,10 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 
 func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	serverMessage, err := newServerMessage(reader)
-	defer serverMessage.put()
 	if err != nil {
 		return err
 	}
+	defer serverMessage.put()
 
 	if PrintTunnelData {
 		logrus.Debug("REQUEST ", serverMessage)
@@ -253,17 +251,20 @@ func (s *Session) closeConnection(connID int64, err error) {
 	}
 }
 
-func (s *Session) clientConnect(ctx context.Context, message *message) {
-	conn := newConnection(message.connID, s, message.proto, message.address)
+func (s *Session) clientConnect(ctx context.Context, msg *message) {
+	proto := msg.proto
+	address := msg.address
+	msg.put()
+	conn := newConnection(msg.connID, s, proto, address)
 
 	s.Lock()
-	s.conns[message.connID] = conn
+	s.conns[msg.connID] = conn
 	if PrintTunnelData {
 		logrus.Debugf("CONNECTIONS %d %d", s.sessionKey, len(s.conns))
 	}
 	s.Unlock()
 
-	go clientDial(ctx, s.dialer, conn, message.proto, message.address)
+	go clientDial(ctx, s.dialer, conn, proto, address)
 }
 
 type connResult struct {
