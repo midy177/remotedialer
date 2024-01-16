@@ -7,20 +7,25 @@ import (
 	"time"
 )
 
-type Hijacker func(conn net.Conn, proto, address string) (next bool)
+type Hijacker func(ctx context.Context, conn net.Conn, proto, address string) (next bool)
 
-var DialHijack Hijacker = func(conn net.Conn, proto, address string) (next bool) {
+var DialHijack Hijacker = func(ctx context.Context, conn net.Conn, proto, address string) (next bool) {
 	return true
 }
 
 func clientDial(ctx context.Context, dialer Dialer, conn *connection, proto, address string) {
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		fmt.Println("Recovered from panic:", r)
+	//	}
+	//}()
 	defer func(conn *connection) {
 		_ = conn.Close()
 	}(conn)
 
 	// Do client hijacker
-	if !DialHijack(conn, proto, address) {
-		conn.tunnelClose(io.EOF)
+	if !DialHijack(ctx, conn, proto, address) {
+		conn.doTunnelClose(io.EOF)
 		return
 	}
 
@@ -39,7 +44,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, proto, add
 	cancel()
 
 	if err != nil {
-		conn.tunnelClose(err)
+		conn.doTunnelClose(err)
 		return
 	}
 	defer func(netConn net.Conn) {

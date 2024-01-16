@@ -2,14 +2,13 @@ package remotedialer
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
+	"github.com/lxzan/gws"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/midy177/remotedialer/metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -76,12 +75,12 @@ func (p *peer) start(ctx context.Context, s *Server) {
 		Token: {s.PeerToken},
 	}
 
-	dialer := &websocket.Dialer{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-		HandshakeTimeout: HandshakeTimeOut,
-	}
+	//dialer := &gws.Dialer{
+	//	TLSClientConfig: &tls.Config{
+	//		InsecureSkipVerify: true,
+	//	},
+	//	HandshakeTimeout: HandshakeTimeOut,
+	//}
 
 outer:
 	for {
@@ -91,16 +90,7 @@ outer:
 		default:
 		}
 
-		metrics.IncSMTotalAddPeerAttempt(p.id)
-		ws, _, err := dialer.Dial(p.url, headers)
-		if err != nil {
-			logrus.Errorf("Failed to connect to peer %s [local ID=%s]: %v", p.url, s.PeerID, err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		metrics.IncSMTotalPeerConnected(p.id)
-
-		session := NewClientSession(func(string, string) bool { return true }, ws)
+		session := NewClientSessionWithoutConn(func(string, string) bool { return true })
 		session.dialer = func(ctx context.Context, network, address string) (net.Conn, error) {
 			parts := strings.SplitN(network, "::", 2)
 			if len(parts) != 2 {
@@ -109,17 +99,27 @@ outer:
 			d := s.Dialer(parts[0])
 			return d(ctx, parts[1], address)
 		}
+		clientOption := DefaultClientOption(p.url, headers)
+		metrics.IncSMTotalAddPeerAttempt(p.id)
+		app, _, err := gws.NewClient(session, clientOption)
+		if err != nil {
+			logrus.Errorf("Failed to connect to peer %s [local ID=%s]: %v", p.url, s.PeerID, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		// The client sends the first ping, which is used to maintain the connection.
+		_ = app.WritePing(nil)
+		metrics.IncSMTotalPeerConnected(p.id)
 
 		s.sessions.addListener(session)
-		_, err = session.Serve(ctx)
+		//_, err = session.Serve(ctx)
+		app.ReadLoop()
 		s.sessions.removeListener(session)
 		session.Close()
-
 		if err != nil {
 			logrus.Errorf("Failed to serve peer connection %s: %v", p.id, err)
 		}
 
-		_ = ws.Close()
 		time.Sleep(5 * time.Second)
 	}
 }

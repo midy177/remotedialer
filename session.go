@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lxzan/gws"
 	"io"
 	"net"
 	"os"
@@ -13,9 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
+
+type onConnect func(context.Context, *Session) error
 
 type Session struct {
 	sync.Mutex
@@ -23,7 +25,7 @@ type Session struct {
 	nextConnID       int64
 	clientKey        string
 	sessionKey       int64
-	conn             *wsConn
+	conn             *gwsConn
 	conns            map[int64]*connection
 	remoteClientKeys map[string]map[int]bool
 	auth             ConnectAuthorizer
@@ -31,6 +33,7 @@ type Session struct {
 	pingWait         chan struct{}
 	dialer           Dialer
 	client           bool
+	onConnect        onConnect
 }
 
 // PrintTunnelData No tunnel logging by default
@@ -42,14 +45,18 @@ func init() {
 	}
 }
 
-func NewClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *Session {
+func NewClientSession(auth ConnectAuthorizer, conn *gws.Conn) *Session {
 	return NewClientSessionWithDialer(auth, conn, nil)
 }
 
-func NewClientSessionWithDialer(auth ConnectAuthorizer, conn *websocket.Conn, dialer Dialer) *Session {
+func NewClientSessionWithoutConn(auth ConnectAuthorizer) *Session {
+	return NewClientSessionWithDialerWithoutConn(auth, nil)
+}
+
+func NewClientSessionWithDialer(auth ConnectAuthorizer, conn *gws.Conn, dialer Dialer) *Session {
 	return &Session{
 		clientKey: "client",
-		conn:      newWSConn(conn),
+		conn:      newGWSConn(conn),
 		conns:     map[int64]*connection{},
 		auth:      auth,
 		client:    true,
@@ -58,72 +65,36 @@ func NewClientSessionWithDialer(auth ConnectAuthorizer, conn *websocket.Conn, di
 	}
 }
 
-func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *Session {
+func NewClientSessionWithDialerWithoutConn(auth ConnectAuthorizer, dialer Dialer) *Session {
+	return &Session{
+		clientKey: "client",
+		conns:     map[int64]*connection{},
+		auth:      auth,
+		client:    true,
+		dialer:    dialer,
+		pingWait:  make(chan struct{}, 1),
+	}
+}
+
+func newSessionWithoutConn(sessionKey int64, clientKey string) *Session {
 	return &Session{
 		nextConnID:       1,
 		clientKey:        clientKey,
 		sessionKey:       sessionKey,
-		conn:             newWSConn(conn),
 		conns:            map[int64]*connection{},
 		remoteClientKeys: map[string]map[int]bool{},
 		pingWait:         make(chan struct{}, 1),
 	}
 }
 
-func (s *Session) startPings(rootCtx context.Context) {
-	ctx, cancel := context.WithCancel(rootCtx)
-	s.pingCancel = cancel
-	//s.pingWait.Add(1)
-
-	go func() {
-		defer close(s.pingWait)
-
-		t := time.NewTicker(PingWriteInterval)
-		defer t.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				s.conn.Lock()
-				if err := s.conn.conn.WriteControl(websocket.PingMessage, []byte(""), time.Now().Add(PingWaitDuration)); err != nil {
-					logrus.WithError(err).Error("Error writing ping")
-				}
-				logrus.Debug("Wrote ping")
-				s.conn.Unlock()
-			}
-		}
-	}()
-}
-
-func (s *Session) stopPings() {
-	if s.pingCancel == nil {
-		return
-	}
-
-	s.pingCancel()
-	<-s.pingWait
-}
-
-func (s *Session) Serve(ctx context.Context) (int, error) {
-	if s.client {
-		s.startPings(ctx)
-	}
-
-	for {
-		msType, reader, err := s.conn.NextReader()
-		if err != nil {
-			return 400, err
-		}
-
-		if msType != websocket.BinaryMessage {
-			return 400, errWrongMessageType
-		}
-
-		if err := s.serveMessage(ctx, reader); err != nil {
-			return 500, err
-		}
+func newSession(sessionKey int64, clientKey string, conn *gws.Conn) *Session {
+	return &Session{
+		nextConnID:       1,
+		clientKey:        clientKey,
+		sessionKey:       sessionKey,
+		conn:             newGWSConn(conn),
+		conns:            map[int64]*connection{},
+		remoteClientKeys: map[string]map[int]bool{},
 	}
 }
 
@@ -334,8 +305,6 @@ func (s *Session) Close() {
 	s.Lock()
 	defer s.Unlock()
 
-	s.stopPings()
-
 	for _, conn := range s.conns {
 		conn.tunnelClose(errors.New("tunnel disconnect"))
 	}
@@ -349,7 +318,7 @@ func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 	defer msg.put()
 	_, err := s.writeMessage(time.Time{}, msg)
 	if err != nil {
-		_ = s.conn.conn.Close()
+		s.conn.conn.WriteClose(1000, nil)
 	}
 }
 
@@ -359,6 +328,63 @@ func (s *Session) sessionRemoved(clientKey string, sessionKey int64) {
 	defer msg.put()
 	_, err := s.writeMessage(time.Time{}, msg)
 	if err != nil {
-		_ = s.conn.conn.Close()
+		s.conn.conn.WriteClose(1000, nil)
+	}
+}
+
+// Implement gws handler
+
+func (s *Session) OnOpen(socket *gws.Conn) {
+	_ = socket.SetDeadline(time.Now().Add(PingWaitDuration))
+	s.conn = newGWSConn(socket)
+	if s.client {
+		go func(conn *gws.Conn, ses *Session) {
+			// The client sends the first ping, which is used to maintain the connection.
+			_ = conn.WritePing(nil)
+			t := time.NewTicker(PingWriteInterval)
+		outer:
+			for {
+				select {
+				case <-s.pingWait:
+					logrus.Infof("clientKey: %s tunnel is close.", ses.clientKey)
+					break outer
+				case <-t.C:
+					_ = conn.WritePing(nil)
+				}
+			}
+		}(socket, s)
+	}
+}
+
+func (s *Session) OnClose(socket *gws.Conn, err error) {
+	close(s.pingWait)
+}
+
+func (s *Session) OnPing(socket *gws.Conn, payload []byte) {
+	_ = socket.SetDeadline(time.Now().Add(PingWaitDuration))
+	_ = socket.WritePong(nil)
+	logrus.Debugf("receive a ping message!")
+}
+
+func (s *Session) OnPong(socket *gws.Conn, payload []byte) {
+	_ = socket.SetDeadline(time.Now().Add(PingWaitDuration))
+	logrus.Debugf("receive a pong message!")
+}
+
+func (s *Session) OnMessage(socket *gws.Conn, msg *gws.Message) {
+	defer func() {
+		_ = msg.Close()
+	}()
+
+	if msg.Opcode != gws.OpcodeBinary {
+		socket.WriteClose(1000, nil)
+		logrus.Infof("error in remotedialer server [%d]: %v", 400, errWrongMessageType)
+		return
+	}
+
+	if err := s.serveMessage(context.Background(), msg.Data); err != nil {
+		socket.WriteClose(1000, nil)
+		logrus.Infof("error in remotedialer server [%d]: %v", 500, err)
+		return
 	}
 }

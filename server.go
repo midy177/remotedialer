@@ -1,13 +1,12 @@
 package remotedialer
 
 import (
-	"net/http"
-	"sync"
-	"time"
-
-	"github.com/gorilla/websocket"
+	"github.com/lxzan/gws"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"math/rand"
+	"net/http"
+	"sync"
 )
 
 var (
@@ -18,7 +17,7 @@ var (
 type Authorizer func(req *http.Request) (clientKey string, authed bool, err error)
 type ErrorWriter func(rw http.ResponseWriter, req *http.Request, code int, err error)
 
-func DefaultErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err error) {
+var DefaultErrorWriter = func(rw http.ResponseWriter, req *http.Request, code int, err error) {
 	rw.WriteHeader(code)
 	_, _ = rw.Write([]byte(err.Error()))
 }
@@ -28,55 +27,42 @@ type Server struct {
 	PeerToken               string
 	ClientConnectAuthorizer ConnectAuthorizer
 	authorizer              Authorizer
-	errorWriter             ErrorWriter
 	sessions                *sessionManager
 	peers                   map[string]*peer
 	peerLock                sync.Mutex
 }
 
-func New(auth Authorizer, errorWriter ErrorWriter) *Server {
+func New(auth Authorizer) *Server {
 	return &Server{
-		peers:       map[string]*peer{},
-		authorizer:  auth,
-		errorWriter: errorWriter,
-		sessions:    newSessionManager(),
+		peers:      map[string]*peer{},
+		authorizer: auth,
+		sessions:   newSessionManager(),
 	}
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	clientKey, authed, p, err := s.auth(req)
 	if err != nil {
-		s.errorWriter(rw, req, 400, err)
+		DefaultErrorWriter(rw, req, 400, err)
 		return
 	}
 	if !authed {
-		s.errorWriter(rw, req, 401, errFailedAuth)
+		DefaultErrorWriter(rw, req, 401, errFailedAuth)
 		return
 	}
-
-	logrus.Infof("Handling backend connection request [%s]", clientKey)
-
-	upgrader := websocket.Upgrader{
-		HandshakeTimeout: 5 * time.Second,
-		CheckOrigin:      func(r *http.Request) bool { return true },
-		Error:            s.errorWriter,
-	}
-
-	conn, err := upgrader.Upgrade(rw, req, nil)
+	sessionKey := rand.Int63()
+	session := newSessionWithoutConn(sessionKey, clientKey)
+	defer session.Close()
+	upgrader := gws.NewUpgrader(session, DefaultServerOption())
+	conn, err := upgrader.Upgrade(rw, req)
 	if err != nil {
-		s.errorWriter(rw, req, 400, errors.Wrapf(err, "Error during upgrade for host [%v]", clientKey))
 		return
 	}
-
-	session := s.sessions.add(clientKey, conn, p)
+	logrus.Infof("Handling backend connection request [%s]", clientKey)
+	s.sessions.add(clientKey, session, p)
 	session.auth = s.ClientConnectAuthorizer
 	defer s.sessions.remove(session)
-
-	code, err := session.Serve(req.Context())
-	if err != nil {
-		// Hijacked so we can't write to the client
-		logrus.Infof("error in remotedialer server [%d]: %v", code, err)
-	}
+	conn.ReadLoop()
 }
 
 func (s *Server) auth(req *http.Request) (clientKey string, authed, peer bool, err error) {

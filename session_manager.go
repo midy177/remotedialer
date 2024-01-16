@@ -3,11 +3,9 @@ package remotedialer
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 
-	"github.com/gorilla/websocket"
 	"github.com/midy177/remotedialer/metrics"
 )
 
@@ -89,9 +87,9 @@ func (sm *sessionManager) getDialer(clientKey string) (Dialer, error) {
 	return nil, fmt.Errorf("failed to find Session for client %s", clientKey)
 }
 
-func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool) *Session {
-	sessionKey := rand.Int63()
-	session := newSession(sessionKey, clientKey, conn)
+func (sm *sessionManager) add(clientKey string, session *Session, peer bool) *Session {
+	//sessionKey := rand.Int63()
+	//session := newSession(sessionKey, clientKey, conn)
 
 	sm.Lock()
 	defer sm.Unlock()

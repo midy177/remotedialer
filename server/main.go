@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +20,6 @@ import (
 )
 
 var (
-	clients = map[string]*http.Client{}
 	l       sync.Mutex
 	counter int64
 )
@@ -36,8 +38,11 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 	vars := mux.Vars(req)
 	clientKey := vars["id"]
 	url := fmt.Sprintf("%s://%s%s", vars["scheme"], vars["host"], vars["path"])
-	client := getClient(server, clientKey, timeout)
-
+	client, err := getClient(server, clientKey, timeout)
+	if err != nil {
+		remotedialer.DefaultErrorWriter(rw, req, 500, err)
+		return
+	}
 	id := atomic.AddInt64(&counter, 1)
 	logrus.Infof("[%03d] REQ t=%s %s", id, timeout, url)
 
@@ -64,18 +69,16 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 	logrus.Infof("[%03d] REQ DONE t=%s %s", id, timeout, url)
 }
 
-func getClient(server *remotedialer.Server, clientKey, timeout string) *http.Client {
+func getClient(server *remotedialer.Server, clientKey, timeout string) (*http.Client, error) {
 	l.Lock()
 	defer l.Unlock()
 
-	key := fmt.Sprintf("%s/%s", clientKey, timeout)
-	client := clients[key]
-	if client != nil {
-		return client
+	if !server.HasSession(clientKey) {
+		return nil, errors.New("not found clientKey's dialer")
 	}
 
 	dialer := server.Dialer(clientKey)
-	client = &http.Client{
+	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext: dialer,
 		},
@@ -87,8 +90,7 @@ func getClient(server *remotedialer.Server, clientKey, timeout string) *http.Cli
 		}
 	}
 
-	clients[key] = client
-	return client
+	return client, nil
 }
 
 func main() {
@@ -111,7 +113,7 @@ func main() {
 		remotedialer.PrintTunnelData = true
 	}
 
-	handler := remotedialer.New(authorizer, remotedialer.DefaultErrorWriter)
+	handler := remotedialer.New(authorizer)
 	handler.PeerToken = peerToken
 	handler.PeerID = peerID
 
@@ -128,7 +130,9 @@ func main() {
 	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, req *http.Request) {
 		Client(handler, rw, req)
 	})
-
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
 	fmt.Println("Listening on ", addr)
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
