@@ -16,6 +16,9 @@ var DefaultServerOption ServerOption = func() (option *gws.ServerOption) {
 		CompressEnabled:  false,        // Enable compression
 		Recovery:         gws.Recovery, // Exception recovery
 		Logger:           logrus.StandardLogger(),
+		NewSession: func() gws.SessionStorage {
+			return newSMap()
+		},
 	}
 }
 
@@ -28,5 +31,8 @@ var DefaultClientOption ClientOption = func(addr string, headers http.Header) (o
 		Addr:             addr,
 		RequestHeader:    headers,
 		Logger:           logrus.StandardLogger(),
+		NewSession: func() gws.SessionStorage {
+			return newSMap()
+		},
 	}
 }
