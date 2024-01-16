@@ -252,10 +252,7 @@ func (s *Session) closeConnection(connID int64, err error) {
 }
 
 func (s *Session) clientConnect(ctx context.Context, msg *message) {
-	proto := msg.proto
-	address := msg.address
-	msg.put()
-	conn := newConnection(msg.connID, s, proto, address)
+	conn := newConnection(msg.connID, s, msg.proto, msg.address)
 
 	s.Lock()
 	s.conns[msg.connID] = conn
@@ -264,7 +261,7 @@ func (s *Session) clientConnect(ctx context.Context, msg *message) {
 	}
 	s.Unlock()
 
-	go clientDial(ctx, s.dialer, conn, proto, address)
+	go clientDial(ctx, s.dialer, conn, msg.proto, msg.address)
 }
 
 type connResult struct {

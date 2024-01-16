@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -128,7 +130,9 @@ func main() {
 	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, req *http.Request) {
 		Client(handler, rw, req)
 	})
-
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
 	fmt.Println("Listening on ", addr)
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
