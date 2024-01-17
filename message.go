@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"github.com/lxzan/gws"
 	"io"
 	"math/rand"
 	"strings"
@@ -152,7 +152,7 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		}
 	}
 	if m.messageType == Connect {
-		bytes, err := io.ReadAll(io.LimitReader(buf, 100))
+		bytes, err := io.ReadAll(io.LimitReader(buf, 512))
 		if err != nil {
 			m.put()
 			return nil, err
@@ -251,7 +251,7 @@ func (m *message) Read(p []byte) (int, error) {
 }
 
 func (m *message) WriteTo(deadline time.Time, wsConn *gwsConn) (int, error) {
-	err := wsConn.WriteMessage(websocket.BinaryMessage, deadline, m.Bytes())
+	err := wsConn.WriteMessage(gws.OpcodeBinary, deadline, m.Bytes())
 	return len(m.bytes), err
 }
 
