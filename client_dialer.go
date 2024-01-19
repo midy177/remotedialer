@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-type Hijacker func(conn net.Conn, proto, address string) (next bool)
+type Hijacker func(ctx context.Context, conn net.Conn, proto, address string) (next bool)
 
-var DialHijack Hijacker = func(conn net.Conn, proto, address string) (next bool) {
+var DialHijack Hijacker = func(ctx context.Context, conn net.Conn, proto, address string) (next bool) {
 	return true
 }
 
@@ -19,7 +19,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, proto, add
 	}(conn)
 
 	// Do client hijacker
-	if !DialHijack(conn, proto, address) {
+	if !DialHijack(ctx, conn, proto, address) {
 		conn.doTunnelClose(io.EOF)
 		return
 	}
