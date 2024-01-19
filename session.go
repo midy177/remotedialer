@@ -342,6 +342,7 @@ func (s *Session) OnOpen(socket *gws.Conn) {
 			// The client sends the first ping, which is used to maintain the connection.
 			_ = conn.WritePing(nil)
 			t := time.NewTicker(PingWriteInterval)
+			defer t.Stop()
 		outer:
 			for {
 				select {
